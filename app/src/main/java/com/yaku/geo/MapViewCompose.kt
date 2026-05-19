@@ -1,12 +1,23 @@
 package com.yaku.geo
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -19,7 +30,6 @@ import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
 
 /**
  * Composable that displays an OpenStreetMap using osmdroid.
- * osmdroid is a free and open-source library that doesn't require an API key.
  */
 @Composable
 fun OsmMapView(modifier: Modifier = Modifier) {
@@ -37,8 +47,9 @@ fun OsmMapView(modifier: Modifier = Modifier) {
         MapView(context).apply {
             setTileSource(TileSourceFactory.MAPNIK)
             setMultiTouchControls(true)
+            setBuiltInZoomControls(false)
             controller.setZoom(15.0)
-            controller.setCenter(GeoPoint(0.0, 0.0)) // Default center
+            controller.setCenter(GeoPoint(0.0, 0.0))
         }
     }
 
@@ -49,7 +60,7 @@ fun OsmMapView(modifier: Modifier = Modifier) {
         }
     }
 
-    // Add overlay once
+    // Add overlay
     remember(mapView) {
         mapView.overlays.add(locationOverlay)
         true
@@ -78,8 +89,44 @@ fun OsmMapView(modifier: Modifier = Modifier) {
         }
     }
 
-    AndroidView(
-        factory = { mapView },
-        modifier = modifier.fillMaxSize()
-    )
+    Box(modifier = modifier.fillMaxSize()) {
+        AndroidView(
+            factory = { mapView },
+            modifier = Modifier.fillMaxSize()
+        )
+
+        // Control buttons column
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            FloatingActionButton(
+                onClick = { mapView.controller.zoomIn() },
+                modifier = Modifier.padding(bottom = 8.dp)
+            ) {
+                Icon(imageVector = Icons.Default.Add, contentDescription = "Zoom In")
+            }
+
+            FloatingActionButton(
+                onClick = { mapView.controller.zoomOut() },
+                modifier = Modifier.padding(bottom = 16.dp)
+            ) {
+                Icon(imageVector = Icons.Default.Remove, contentDescription = "Zoom Out")
+            }
+
+            FloatingActionButton(
+                onClick = {
+                    locationOverlay.enableFollowLocation()
+                    val location = locationOverlay.myLocation
+                    if (location != null) {
+                        mapView.controller.animateTo(location)
+                    }
+                }
+            ) {
+                Icon(imageVector = Icons.Default.MyLocation, contentDescription = "My Location")
+            }
+        }
+    }
 }
