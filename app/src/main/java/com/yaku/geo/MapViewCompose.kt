@@ -24,6 +24,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
+import org.osmdroid.util.BoundingBox
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider
 import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
@@ -48,6 +49,16 @@ fun OsmMapView(modifier: Modifier = Modifier) {
             setTileSource(TileSourceFactory.MAPNIK)
             setMultiTouchControls(true)
             setBuiltInZoomControls(false)
+            
+            // Limit zoom and repetition
+            minZoomLevel = 3.0
+            maxZoomLevel = 20.0
+            setHorizontalMapRepetitionEnabled(false)
+            setVerticalMapRepetitionEnabled(false)
+            
+            // Limit scrollable area to world bounds
+            setScrollableAreaLimitDouble(BoundingBox(85.0, 180.0, -85.0, -180.0))
+            
             controller.setZoom(15.0)
             controller.setCenter(GeoPoint(0.0, 0.0))
         }
