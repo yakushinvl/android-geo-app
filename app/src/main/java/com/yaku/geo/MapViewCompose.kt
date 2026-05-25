@@ -29,13 +29,27 @@ import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider
 import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
 
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.lifecycle.viewmodel.compose.viewModel
+
+import android.location.Location
+import android.location.LocationListener
+import android.location.LocationManager
+import android.content.Context
+
 /**
  * Composable that displays an OpenStreetMap using osmdroid.
  */
 @Composable
-fun OsmMapView(modifier: Modifier = Modifier) {
+fun OsmMapView(
+    modifier: Modifier = Modifier,
+    viewModel: LocationViewModel = viewModel()
+) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val visitedPoints by viewModel.visitedPoints.collectAsState()
 
     // Initialize osmdroid configuration
     remember {
@@ -51,7 +65,7 @@ fun OsmMapView(modifier: Modifier = Modifier) {
             setBuiltInZoomControls(false)
             
             // Limit zoom and repetition
-            minZoomLevel = 3.0
+            minZoomLevel = 6.0
             maxZoomLevel = 20.0
             setHorizontalMapRepetitionEnabled(false)
             setVerticalMapRepetitionEnabled(false)
@@ -64,17 +78,64 @@ fun OsmMapView(modifier: Modifier = Modifier) {
         }
     }
 
+    val locationProvider = remember { GpsMyLocationProvider(context) }
     val locationOverlay = remember {
-        MyLocationNewOverlay(GpsMyLocationProvider(context), mapView).apply {
+        MyLocationNewOverlay(locationProvider, mapView).apply {
             enableMyLocation()
             enableFollowLocation()
         }
     }
 
-    // Add overlay
-    remember(mapView) {
-        mapView.overlays.add(locationOverlay)
-        true
+    // Fog of War Overlay
+    val fogOverlay = remember {
+        FogOfWarOverlay(visitedPoints)
+    }
+
+    // Update fog when points change
+    LaunchedEffect(visitedPoints) {
+        fogOverlay.setPoints(visitedPoints)
+        mapView.invalidate()
+    }
+
+    // Add overlays - Order: Fog first, then Location marker on top
+    LaunchedEffect(mapView) {
+        if (!mapView.overlays.contains(fogOverlay)) {
+            mapView.overlays.add(fogOverlay)
+        }
+        if (!mapView.overlays.contains(locationOverlay)) {
+            mapView.overlays.add(locationOverlay)
+        }
+        mapView.invalidate()
+    }
+
+    // Track location using Android LocationManager to avoid conflict with osmdroid provider
+    DisposableEffect(context) {
+        val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        val locationListener = object : LocationListener {
+            override fun onLocationChanged(location: Location) {
+                val geoPoint = GeoPoint(location.latitude, location.longitude)
+                viewModel.addPoint(geoPoint)
+                fogOverlay.setCurrentLocation(geoPoint)
+                mapView.postInvalidate()
+            }
+            override fun onProviderEnabled(provider: String) {}
+            override fun onProviderDisabled(provider: String) {}
+        }
+
+        try {
+            locationManager.requestLocationUpdates(
+                LocationManager.GPS_PROVIDER,
+                1000L, // 1 second
+                0f,    // 0 meters
+                locationListener
+            )
+        } catch (e: SecurityException) {
+            // Permission should be handled by MainActivity
+        }
+
+        onDispose {
+            locationManager.removeUpdates(locationListener)
+        }
     }
 
     // Lifecycle handling
@@ -84,10 +145,8 @@ fun OsmMapView(modifier: Modifier = Modifier) {
                 Lifecycle.Event.ON_RESUME -> {
                     mapView.onResume()
                     locationOverlay.enableMyLocation()
-                    locationOverlay.enableFollowLocation()
                 }
                 Lifecycle.Event.ON_PAUSE -> {
-                    locationOverlay.disableFollowLocation()
                     locationOverlay.disableMyLocation()
                     mapView.onPause()
                 }
