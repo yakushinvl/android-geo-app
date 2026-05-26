@@ -50,6 +50,7 @@ import android.os.Bundle
 @Composable
 fun OsmMapView(
     modifier: Modifier = Modifier,
+    contentPadding: PaddingValues = PaddingValues(0.dp),
     viewModel: LocationViewModel = viewModel()
 ) {
     val context = LocalContext.current
@@ -81,6 +82,9 @@ fun OsmMapView(
             
             controller.setZoom(15.0)
             controller.setCenter(GeoPoint(0.0, 0.0))
+            
+            // Ensure map fills space under status bar correctly
+            setFitsSystemWindows(false)
         }
     }
 
@@ -129,6 +133,19 @@ fun OsmMapView(
         }
 
         try {
+            // 1. Get last known location for immediate feedback
+            val lastGpsLocation = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER)
+            val lastNetworkLocation = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
+            val initialLocation = lastGpsLocation ?: lastNetworkLocation
+            
+            initialLocation?.let {
+                val geoPoint = GeoPoint(it.latitude, it.longitude)
+                viewModel.addPoint(geoPoint)
+                fogOverlay.setCurrentLocation(geoPoint)
+                mapView.postInvalidate()
+            }
+
+            // 2. Request periodic updates
             locationManager.requestLocationUpdates(
                 LocationManager.GPS_PROVIDER,
                 1000L, // 1 second
@@ -175,6 +192,7 @@ fun OsmMapView(
         Column(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
+                .padding(contentPadding)
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {

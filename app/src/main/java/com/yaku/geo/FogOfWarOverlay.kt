@@ -10,6 +10,7 @@ import com.yaku.geo.data.VisitedPoint
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Overlay
+import android.graphics.Matrix
 
 class FogOfWarOverlay(private var points: List<VisitedPoint>) : Overlay() {
     
@@ -42,39 +43,47 @@ class FogOfWarOverlay(private var points: List<VisitedPoint>) : Overlay() {
         this.currentLocation = location
     }
 
+    private val identityMatrix = Matrix()
+
     override fun draw(canvas: Canvas, mapView: MapView, shadow: Boolean) {
         if (shadow) return
         
         val projection = mapView.projection
-        val clipBounds = canvas.clipBounds
+        val width = mapView.width.toFloat()
+        val height = mapView.height.toFloat()
         
-        // Save layer to support PorterDuff.Mode.CLEAR
-        // Using null for bounds saves the entire current clip area
-        val saveCount = canvas.saveLayer(null, null)
+        if (width <= 0 || height <= 0) return
+
+        // 1. Save state and switch to screen-space (0,0 is top-left of the View)
+        val saveCount = canvas.save()
+        canvas.setMatrix(identityMatrix)
         
-        // 1. Draw the fog
-        canvas.drawRect(clipBounds, fogPaint)
+        // 2. Create a layer for the entire screen to support PorterDuff.Mode.CLEAR
+        // Explicitly defining bounds helps avoid artifacts on some devices
+        val layerCount = canvas.saveLayer(0f, 0f, width, height, null)
         
-        // Use a meter-based radius so it scales geographically with the map
+        // 3. Draw the fog over the whole screen
+        canvas.drawRect(0f, 0f, width, height, fogPaint)
+        
+        // 4. Calculate radius geographically
         val radiusInMeters = 100.0 
         val radius = projection.metersToPixels(radiusInMeters.toFloat()).coerceAtLeast(10f)
         
         val screenPoint = Point()
         
-        // 3. Draw historical points as circles only (no lines)
+        // 5. Draw historical points (projection.toPixels returns screen coordinates)
         for (point in points) {
             projection.toPixels(GeoPoint(point.latitude, point.longitude), screenPoint)
-            
-            // Draw clearing circle
             canvas.drawCircle(screenPoint.x.toFloat(), screenPoint.y.toFloat(), radius, clearPaint)
         }
 
-        // 4. Draw current location hole
+        // 6. Draw current location hole
         currentLocation?.let {
             projection.toPixels(it, screenPoint)
             canvas.drawCircle(screenPoint.x.toFloat(), screenPoint.y.toFloat(), radius, clearPaint)
         }
         
+        canvas.restoreToCount(layerCount)
         canvas.restoreToCount(saveCount)
     }
 }

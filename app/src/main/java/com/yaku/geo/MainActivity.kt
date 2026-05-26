@@ -69,7 +69,10 @@ fun MainScreen() {
 
     Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
         if (hasLocationPermission) {
-            OsmMapView(modifier = Modifier.padding(innerPadding))
+            OsmMapView(
+                contentPadding = innerPadding,
+                modifier = Modifier.fillMaxSize()
+            )
         } else {
             Box(
                 modifier = Modifier
