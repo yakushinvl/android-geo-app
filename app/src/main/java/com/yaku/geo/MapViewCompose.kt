@@ -29,15 +29,20 @@ import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider
 import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
 
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.*
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.ui.graphics.Color as ComposeColor
 import androidx.lifecycle.viewmodel.compose.viewModel
-
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
 import android.content.Context
+import android.os.Bundle
 
 /**
  * Composable that displays an OpenStreetMap using osmdroid.
@@ -50,6 +55,7 @@ fun OsmMapView(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val visitedPoints by viewModel.visitedPoints.collectAsState()
+    var showDebugMenu by remember { mutableStateOf(false) }
 
     // Initialize osmdroid configuration
     remember {
@@ -172,18 +178,29 @@ fun OsmMapView(
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            if (BuildConfig.DEBUG) {
+                FloatingActionButton(
+                    onClick = { showDebugMenu = true },
+                    modifier = Modifier.padding(bottom = 8.dp),
+                    containerColor = ComposeColor.Red,
+                    contentColor = ComposeColor.White
+                ) {
+                    Icon(imageVector = Icons.Default.BugReport, contentDescription = "Открыть дебаг меню")
+                }
+            }
+
             FloatingActionButton(
                 onClick = { mapView.controller.zoomIn() },
                 modifier = Modifier.padding(bottom = 8.dp)
             ) {
-                Icon(imageVector = Icons.Default.Add, contentDescription = "Zoom In")
+                Icon(imageVector = Icons.Default.Add, contentDescription = "Приблизить")
             }
 
             FloatingActionButton(
                 onClick = { mapView.controller.zoomOut() },
                 modifier = Modifier.padding(bottom = 16.dp)
             ) {
-                Icon(imageVector = Icons.Default.Remove, contentDescription = "Zoom Out")
+                Icon(imageVector = Icons.Default.Remove, contentDescription = "Отдалить")
             }
 
             FloatingActionButton(
@@ -195,7 +212,61 @@ fun OsmMapView(
                     }
                 }
             ) {
-                Icon(imageVector = Icons.Default.MyLocation, contentDescription = "My Location")
+                Icon(imageVector = Icons.Default.MyLocation, contentDescription = "Моя геолокация")
+            }
+        }
+
+        // Full-screen Debug Menu
+        if (showDebugMenu) {
+            DebugMenu(
+                onDismiss = { showDebugMenu = false },
+                onResetHistory = {
+                    viewModel.clearHistory()
+                    showDebugMenu = false
+                }
+            )
+        }
+    }
+}
+
+@Composable
+fun DebugMenu(
+    onDismiss: () -> Unit,
+    onResetHistory: () -> Unit
+) {
+    BackHandler { onDismiss() }
+
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.surface
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Дебаг меню",
+                    style = MaterialTheme.typography.headlineMedium
+                )
+                IconButton(onClick = onDismiss) {
+                    Icon(imageVector = Icons.Default.Close, contentDescription = "Закрыть")
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Button(
+                onClick = onResetHistory,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = ComposeColor.Red)
+            ) {
+                Text("Сбросить исорию геолокаций")
             }
         }
     }
