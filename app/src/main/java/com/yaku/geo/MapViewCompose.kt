@@ -41,6 +41,42 @@ import android.location.LocationListener
 import android.location.LocationManager
 import android.content.Context
 
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import kotlinx.coroutines.delay
+
+@Composable
+fun RepeatingFloatingActionButton(
+    onClick: () -> Unit,
+    onRepeat: () -> Unit,
+    modifier: Modifier = Modifier,
+    containerColor: ComposeColor = FloatingActionButtonDefaults.containerColor,
+    contentColor: ComposeColor = contentColorFor(containerColor),
+    content: @Composable () -> Unit
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+
+    LaunchedEffect(isPressed) {
+        if (isPressed) {
+            delay(400) // Initial delay before repeat
+            while (isPressed) {
+                onRepeat()
+                delay(150) // Repeat interval
+            }
+        }
+    }
+
+    FloatingActionButton(
+        onClick = onClick,
+        modifier = modifier,
+        interactionSource = interactionSource,
+        containerColor = containerColor,
+        contentColor = contentColor,
+        content = content
+    )
+}
+
 /**
  * Composable that displays an OpenStreetMap using osmdroid.
  */
@@ -200,15 +236,17 @@ fun OsmMapView(
                 }
             }
 
-            FloatingActionButton(
+            RepeatingFloatingActionButton(
                 onClick = { mapView.controller.zoomIn() },
+                onRepeat = { mapView.controller.zoomIn() },
                 modifier = Modifier.padding(bottom = 8.dp)
             ) {
                 Icon(imageVector = Icons.Default.Add, contentDescription = "Приблизить")
             }
 
-            FloatingActionButton(
+            RepeatingFloatingActionButton(
                 onClick = { mapView.controller.zoomOut() },
+                onRepeat = { mapView.controller.zoomOut() },
                 modifier = Modifier.padding(bottom = 16.dp)
             ) {
                 Icon(imageVector = Icons.Default.Remove, contentDescription = "Отдалить")
@@ -219,13 +257,15 @@ fun OsmMapView(
                     locationOverlay.enableFollowLocation()
                     val location = locationOverlay.myLocation
                     if (location != null) {
-                        mapView.controller.animateTo(location)
+                        // Animate to location and zoom in to 18.0
+                        mapView.controller.animateTo(location, 18.0, 1000L)
                     }
                 }
             ) {
                 Icon(imageVector = Icons.Default.MyLocation, contentDescription = "Моя геолокация")
             }
         }
+
 
         // Full-screen Debug Menu
         if (showDebugMenu) {
