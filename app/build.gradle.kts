@@ -13,8 +13,12 @@ android {
         applicationId = "com.yaku.geo"
         minSdk = 31
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        // 1. Считываем versionCode из параметров GitHub, если его нет — ставим 1
+        versionCode = project.findProperty("VERSION_CODE")?.toString()?.toInt() ?: 1
+
+        // 2. Считываем versionName из параметров GitHub, если его нет — ставим "0.1.0-local"
+        versionName = project.findProperty("VERSION_NAME")?.toString() ?: "0.1.0-local"
+
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

@@ -1,19 +1,24 @@
-name: Build Android APK
+name: Build and Release Kotlin APK
+
 on:
   push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
-  workflow_dispatch:
+    tags:
+      - 'v*' # Срабатывает только при пуше тегов (например, v1.0.0)
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
     steps:
       # 1. Скачиваем исходный код репозитория
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # ВАЖНО: скачивает всю историю коммитов, чтобы правильно посчитать versionCode
 
-        # 2. Настраиваем Java (Kotlin-компилятор жестко привязан к версии JDK)
+      # 2. Настраиваем Java (Kotlin-компилятор жестко привязан к версии JDK)
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
@@ -25,13 +30,33 @@ jobs:
       - name: Grant Execute Permission for Gradle
         run: chmod +x ./gradlew
 
-      # 4. Собираем тестовый APK (Debug)
-      - name: Build Debug APK
-        run: ./gradlew assembleDebug
+      # [НОВЫЙ ШАГ] Извлекаем чистую версию из тега и считаем коммиты
+      - name: Parse Version From Tag
+        id: parse_version
+        run: |
+          TAG_NAME=${{ github.ref_name }}
+          VERSION=${TAG_NAME#v} # Убирает букву 'v' из начала (из 'v1.2.3' делает '1.2.3')
+          echo "VERSION_NAME=$VERSION" >> $GITHUB_ENV
+          
+          # Считаем общее количество коммитов для автоматического versionCode
+          COMMITS_COUNT=$(git rev-list --count HEAD)
+          echo "VERSION_CODE=$COMMITS_COUNT" >> $GITHUB_ENV
 
-      # 5. Сохраняем готовый файл в артефакты GitHub Actions
-      - name: Upload APK Artifact
-        uses: actions/upload-artifact@v4
+      # 4. Собираем APK (Передаем версию из тега прямо в Gradle)
+      - name: Build Debug APK
+        run: |
+          ./gradlew assembleDebug \
+            -PVERSION_CODE=${{ env.VERSION_CODE }} \
+            -PVERSION_NAME="${{ env.VERSION_NAME }}"
+
+      # 5. Сохраняем готовый файл в Releases
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
-          name: app-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          files: app/build/outputs/apk/debug/app-debug.apk
+          name: Release ${{ github.ref_name }}
+          tag_name: ${{ github.ref }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
