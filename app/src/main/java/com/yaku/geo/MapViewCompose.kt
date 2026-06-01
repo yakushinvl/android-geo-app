@@ -16,7 +16,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
@@ -34,7 +33,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.ui.graphics.Color as ComposeColor
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -42,7 +40,6 @@ import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
 import android.content.Context
-import android.os.Bundle
 
 /**
  * Composable that displays an OpenStreetMap using osmdroid.
@@ -54,7 +51,7 @@ fun OsmMapView(
     viewModel: LocationViewModel = viewModel()
 ) {
     val context = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     val visitedPoints by viewModel.visitedPoints.collectAsState()
     var showDebugMenu by remember { mutableStateOf(false) }
 
@@ -118,13 +115,12 @@ fun OsmMapView(
         mapView.invalidate()
     }
 
-    // Track location using Android LocationManager to avoid conflict with osmdroid provider
+    // Track location for immediate fog clearing in the UI
     DisposableEffect(context) {
         val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
         val locationListener = object : LocationListener {
             override fun onLocationChanged(location: Location) {
                 val geoPoint = GeoPoint(location.latitude, location.longitude)
-                viewModel.addPoint(geoPoint)
                 fogOverlay.setCurrentLocation(geoPoint)
                 mapView.postInvalidate()
             }
@@ -133,26 +129,23 @@ fun OsmMapView(
         }
 
         try {
-            // 1. Get last known location for immediate feedback
-            val lastGpsLocation = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER)
-            val lastNetworkLocation = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
-            val initialLocation = lastGpsLocation ?: lastNetworkLocation
+            // Get initial location
+            val initial = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER) 
+                ?: locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
             
-            initialLocation?.let {
+            initial?.let {
                 val geoPoint = GeoPoint(it.latitude, it.longitude)
-                viewModel.addPoint(geoPoint)
                 fogOverlay.setCurrentLocation(geoPoint)
                 mapView.postInvalidate()
             }
 
-            // 2. Request periodic updates
             locationManager.requestLocationUpdates(
                 LocationManager.GPS_PROVIDER,
-                1000L, // 1 second
-                0f,    // 0 meters
+                1000L, 
+                0f,
                 locationListener
             )
-        } catch (e: SecurityException) {
+        } catch (_: SecurityException) {
             // Permission should be handled by MainActivity
         }
 

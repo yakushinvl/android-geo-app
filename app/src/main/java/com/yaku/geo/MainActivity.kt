@@ -25,20 +25,30 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import com.yaku.geo.ui.theme.AndroidgeoappTheme
 
+import android.content.Intent
+import android.os.Build
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
             AndroidgeoappTheme {
-                MainScreen()
+                MainScreen(
+                    onPermissionGranted = { startLocationService() }
+                )
             }
         }
+    }
+
+    private fun startLocationService() {
+        val intent = Intent(this, LocationService::class.java)
+        startForegroundService(intent)
     }
 }
 
 @Composable
-fun MainScreen() {
+fun MainScreen(onPermissionGranted: () -> Unit) {
     val context = LocalContext.current
     var hasLocationPermission by remember {
         mutableStateOf(
@@ -52,18 +62,26 @@ fun MainScreen() {
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
-        hasLocationPermission = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+        val granted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
                 permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        hasLocationPermission = granted
+        if (granted) {
+            onPermissionGranted()
+        }
     }
 
     LaunchedEffect(Unit) {
         if (!hasLocationPermission) {
-            permissionLauncher.launch(
-                arrayOf(
-                    Manifest.permission.ACCESS_FINE_LOCATION,
-                    Manifest.permission.ACCESS_COARSE_LOCATION
-                )
+            val perms = mutableListOf(
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION
             )
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                perms.add(Manifest.permission.POST_NOTIFICATIONS)
+            }
+            permissionLauncher.launch(perms.toTypedArray())
+        } else {
+            onPermissionGranted()
         }
     }
 
