@@ -93,7 +93,7 @@ class LocationService : Service() {
     private fun createNotificationChannel() {
         val channel = NotificationChannel(
             CHANNEL_ID,
-            "Tracking movement",
+            "Отслеживание перемещения",
             NotificationManager.IMPORTANCE_LOW
         )
         val manager = getSystemService(NotificationManager::class.java)
@@ -102,8 +102,8 @@ class LocationService : Service() {
 
     private fun createNotification(): Notification {
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Exploration active")
-            .setContentText("Recording your path...")
+            .setContentTitle("Исследование активно")
+            .setContentText("Записываем ваш маршрут...")
             .setSmallIcon(android.R.drawable.ic_menu_mylocation)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOngoing(true)

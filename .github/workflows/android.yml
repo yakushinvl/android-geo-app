@@ -16,9 +16,9 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # ВАЖНО: скачивает всю историю коммитов, чтобы правильно посчитать versionCode
+          fetch-depth: 0
 
-      # 2. Настраиваем Java (Kotlin-компилятор жестко привязан к версии JDK)
+      # 2. Настраиваем Java
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
@@ -30,22 +30,21 @@ jobs:
       - name: Grant Execute Permission for Gradle
         run: chmod +x ./gradlew
 
-      # [НОВЫЙ ШАГ] Извлекаем чистую версию из тега и считаем коммиты
+      # Извлекаем чистую версию из тега и считаем коммиты
       - name: Parse Version From Tag
         id: parse_version
         run: |
           TAG_NAME=${{ github.ref_name }}
-          VERSION=${TAG_NAME#v} # Убирает букву 'v' из начала (из 'v1.2.3' делает '1.2.3')
+          VERSION=${TAG_NAME#v} 
           echo "VERSION_NAME=$VERSION" >> $GITHUB_ENV
           
-          # Считаем общее количество коммитов для автоматического versionCode
           COMMITS_COUNT=$(git rev-list --count HEAD)
           echo "VERSION_CODE=$COMMITS_COUNT" >> $GITHUB_ENV
 
-      # 4. Собираем APK (Передаем версию из тега прямо в Gradle)
-      - name: Build Debug APK
+      # 4. Собираем RELEASE APK
+      - name: Build Release APK
         run: |
-          ./gradlew assembleDebug \
+          ./gradlew app:assembleRelease \
             -PVERSION_CODE=${{ env.VERSION_CODE }} \
             -PVERSION_NAME="${{ env.VERSION_NAME }}"
 
@@ -53,7 +52,8 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: app/build/outputs/apk/debug/app-debug.apk
+          # Путь изменился на release!
+          files: app/build/outputs/apk/release/app-release.apk
           name: Release ${{ github.ref_name }}
           tag_name: ${{ github.ref }}
           draft: false
