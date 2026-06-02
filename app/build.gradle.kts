@@ -20,8 +20,35 @@ android {
         // 2. Считываем versionName из параметров GitHub, если его нет — ставим "0.1.0-local"
         versionName = project.findProperty("VERSION_NAME")?.toString() ?: "0.1.0-local"
 
-
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    // НАСТРОЙКА ПОДПИСИ
+    signingConfigs {
+        create("release") {
+            // Ищем переменные окружения, которые передает GitHub Actions
+            val envKeystorePath = System.getenv("KEYSTORE_PATH")
+            val envKeystorePassword = System.getenv("KEYSTORE_PASSWORD")
+            val envKeyAlias = System.getenv("KEY_ALIAS")
+            val envKeyPassword = System.getenv("KEY_PASSWORD")
+
+            // Если все переменные на месте (сборка в CI) — используем их
+            if (!envKeystorePath.isNullOrEmpty() && !envKeystorePassword.isNullOrEmpty() &&
+                !envKeyAlias.isNullOrEmpty() && !envKeyPassword.isNullOrEmpty()) {
+
+                storeFile = file(envKeystorePath)
+                storePassword = envKeystorePassword
+                keyAlias = envKeyAlias
+                keyPassword = envKeyPassword
+            } else {
+                // Если собираем локально на ПК — копируем данные из готового дебажного конфига
+                val debugConfig = signingConfigs.getByName("debug")
+                storeFile = debugConfig.storeFile
+                storePassword = debugConfig.storePassword
+                keyAlias = debugConfig.keyAlias
+                keyPassword = debugConfig.keyPassword
+            }
+        }
     }
 
     buildTypes {
@@ -31,6 +58,10 @@ android {
         release {
             isMinifyEnabled = false
             buildConfigField("boolean", "DEBUG", "false")
+
+            // Привязываем созданную конфигурацию подписи к релизу
+            signingConfig = signingConfigs.getByName("release")
+
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -51,7 +82,6 @@ android {
 }
 
 dependencies {
-
     implementation(libs.osmdroid)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)

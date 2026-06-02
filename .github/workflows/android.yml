@@ -3,7 +3,7 @@ name: Build and Release Kotlin APK
 on:
   push:
     tags:
-      - 'v*'
+      - 'v*' # Срабатывает только при пуше тегов (например, v1.0.0)
   workflow_dispatch: # Позволяет запускать билд вручную из вкладки Actions
 
 jobs:
@@ -31,7 +31,7 @@ jobs:
       - name: Grant Execute Permission for Gradle
         run: chmod +x ./gradlew
 
-      # Извлекаем чистую версию из тега и считаем коммиты
+      # 4. Извлекаем чистую версию из тега и считаем коммиты
       - name: Parse Version From Tag
         id: parse_version
         run: |
@@ -46,20 +46,31 @@ jobs:
           COMMITS_COUNT=$(git rev-list --count HEAD)
           echo "VERSION_CODE=$COMMITS_COUNT" >> $GITHUB_ENV
 
-      # 4. Собираем RELEASE APK
+      # 5. Воссоздаем файл ключа .jks из сохраненного в GitHub Secrets текста Base64
+      - name: Decode Keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > app/release.jks
+
+      # 6. Собираем RELEASE APK и безопасно передаем секреты через переменные окружения
       - name: Build Release APK
         run: |
           ./gradlew app:assembleRelease \
             -PVERSION_CODE=${{ env.VERSION_CODE }} \
             -PVERSION_NAME="${{ env.VERSION_NAME }}"
+        env:
+          KEYSTORE_PATH: "release.jks"
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
-      # 5. Сохраняем готовый файл в Releases
+      # 7. Сохраняем готовый файл в Releases
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: app/build/outputs/apk/release/*.apk
           name: Release ${{ env.VERSION_NAME }}
-          tag_name: ${{ github.ref_name }}
+          # Используем имя тега, а при ручном запуске подставляем временный технический тег
+          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || format('manual-{0}', env.VERSION_CODE) }}
           draft: false
           prerelease: false
         env:
