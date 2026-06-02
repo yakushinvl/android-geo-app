@@ -34,6 +34,9 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.delay
 import org.osmdroid.config.Configuration
+import org.osmdroid.events.MapListener
+import org.osmdroid.events.ScrollEvent
+import org.osmdroid.events.ZoomEvent
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.BoundingBox
 import org.osmdroid.util.GeoPoint
@@ -42,6 +45,7 @@ import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider
 import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
 import java.text.SimpleDateFormat
 import java.util.*
+import androidx.core.content.edit
 
 @Composable
 fun RepeatingFloatingActionButton(
@@ -92,6 +96,8 @@ fun OsmMapView(
     var showAccountDetails by remember { mutableStateOf(false) }
     var showChangePassword by remember { mutableStateOf(false) }
 
+    val mapPrefs = remember { context.getSharedPreferences("map_state", Context.MODE_PRIVATE) }
+
     remember {
         Configuration.getInstance().load(context, context.getSharedPreferences("osmdroid", 0))
         Configuration.getInstance().userAgentValue = context.packageName
@@ -108,9 +114,31 @@ fun OsmMapView(
             setHorizontalMapRepetitionEnabled(false)
             setVerticalMapRepetitionEnabled(false)
             setScrollableAreaLimitDouble(BoundingBox(85.0, 180.0, -85.0, -180.0))
-            controller.setZoom(15.0)
-            controller.setCenter(GeoPoint(0.0, 0.0))
-            setFitsSystemWindows(false)
+            
+            val lastLat = mapPrefs.getFloat("last_lat", 55.7558f).toDouble() // Default to Moscow
+            val lastLon = mapPrefs.getFloat("last_lon", 37.6173f).toDouble()
+            val lastZoom = mapPrefs.getFloat("last_zoom", 12f).toDouble()
+            
+            controller.setZoom(lastZoom)
+            controller.setCenter(GeoPoint(lastLat, lastLon))
+
+            fitsSystemWindows = false
+
+            addMapListener(object : MapListener {
+                override fun onScroll(event: ScrollEvent?): Boolean {
+                    mapPrefs.edit {
+                        putFloat("last_lat", mapCenter.latitude.toFloat())
+                            .putFloat("last_lon", mapCenter.longitude.toFloat())
+                    }
+                    return false
+                }
+                override fun onZoom(event: ZoomEvent?): Boolean {
+                    mapPrefs.edit {
+                        putFloat("last_zoom", zoomLevelDouble.toFloat())
+                        }
+                    return false
+                }
+            })
         }
     }
 
@@ -147,13 +175,6 @@ fun OsmMapView(
             override fun onProviderDisabled(provider: String) {}
         }
         try {
-            val initial = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER) 
-                ?: locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
-            initial?.let {
-                val geoPoint = GeoPoint(it.latitude, it.longitude)
-                fogOverlay.setCurrentLocation(geoPoint)
-                mapView.postInvalidate()
-            }
             locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000L, 0f, locationListener)
         } catch (_: SecurityException) {}
         onDispose { locationManager.removeUpdates(locationListener) }
