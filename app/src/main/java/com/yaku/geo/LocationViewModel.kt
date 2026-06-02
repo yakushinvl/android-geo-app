@@ -21,7 +21,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import org.osmdroid.util.GeoPoint
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -71,12 +70,6 @@ class LocationViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun addPoint(geoPoint: GeoPoint) {
-        viewModelScope.launch {
-            dao.insert(VisitedPoint(latitude = geoPoint.latitude, longitude = geoPoint.longitude))
-        }
-    }
-    
     fun clearHistory() {
         viewModelScope.launch {
             dao.deleteAll()

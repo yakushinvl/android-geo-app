@@ -3,7 +3,8 @@ name: Build and Release Kotlin APK
 on:
   push:
     tags:
-      - 'v*' # Срабатывает только при пуше тегов (например, v1.0.0)
+      - 'v*'
+  workflow_dispatch: # Позволяет запускать билд вручную из вкладки Actions
 
 jobs:
   build:
@@ -34,7 +35,11 @@ jobs:
       - name: Parse Version From Tag
         id: parse_version
         run: |
-          TAG_NAME=${{ github.ref_name }}
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            TAG_NAME="${{ github.ref_name }}"
+          else
+            TAG_NAME="v0.0.0-manual"
+          fi
           VERSION=${TAG_NAME#v} 
           echo "VERSION_NAME=$VERSION" >> $GITHUB_ENV
           
@@ -52,10 +57,9 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          # Путь изменился на release!
-          files: app/build/outputs/apk/release/app-release.apk
-          name: Release ${{ github.ref_name }}
-          tag_name: ${{ github.ref }}
+          files: app/build/outputs/apk/release/*.apk
+          name: Release ${{ env.VERSION_NAME }}
+          tag_name: ${{ github.ref_name }}
           draft: false
           prerelease: false
         env:

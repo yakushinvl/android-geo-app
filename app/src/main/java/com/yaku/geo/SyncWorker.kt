@@ -51,7 +51,7 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
             } else {
                 Result.retry()
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             Result.failure()
         }
     }
